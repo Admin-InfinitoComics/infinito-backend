@@ -2,122 +2,113 @@ import ResearchPaper from "../models/ResearchPaper.js";
 import CrudRepository from "./crud-repository.js";
 
 class ResearchPaperRepository extends CrudRepository {
-    constructor() {
-        super(ResearchPaper);
-    }
+  constructor() {
+    super(ResearchPaper);
+  }
 
-    async createPaper(data) {
-        try {
-            const paper = await ResearchPaper.create(data);
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
+  async createPaper(data) {
+    try {
+      const paper = await ResearchPaper.create(data);
+      return paper;
+    } catch (error) {
+      console.log("Repository Error (createPaper):", error.message);
+      throw error;
     }
+  }
 
-    async findById(id) {
-        try {
-            const paper = await ResearchPaper.findById(id);
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in repository layer (findById)");
-            throw error;
-        }
+  async findById(id) {
+    try {
+      const paper = await ResearchPaper.findById(id).lean();
+      return paper;
+    } catch (error) {
+      console.log("Repository Error (findById):", error.message);
+      throw error;
     }
+  }
 
-    async destroy(id) {
-        try {
-            const result = await ResearchPaper.findByIdAndDelete(id);
-            return result;
-        } catch (error) {
-            console.log("Something went wrong in repository layer (destroy)");
-            throw error;
-        }
+  async update(id, updateData) {
+    try {
+      const paper = await ResearchPaper.findByIdAndUpdate(id, updateData, { new: true }).lean();
+      return paper;
+    } catch (error) {
+      console.log("Repository Error (update):", error.message);
+      throw error;
     }
+  }
 
-    async getPublishedPapers(page = 1, limit = 10) {
-        try {
-            const skip = (page - 1) * limit;
-            const papers = await ResearchPaper.find({ isPublished: true })
-                .sort({ publicationDate: -1 })
-                .skip(skip)
-                .limit(limit);
-            return papers;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
+  async destroy(id) {
+    try {
+      const result = await ResearchPaper.findByIdAndDelete(id).lean();
+      return result;
+    } catch (error) {
+      console.log("Repository Error (destroy):", error.message);
+      throw error;
     }
+  }
 
-    async getPaperByDoi(doi) {
-        try {
-            const paper = await ResearchPaper.findOne({ doi });
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
-    }
+  async getAll(page = 1, limit = 10, filters = {}, sort = { publicationDate: -1 }) {
+    try {
+      const skip = (page - 1) * limit;
+      const papers = await ResearchPaper.find(filters)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean();
 
-    async searchPapers(query, page = 1, limit = 10) {
-        try {
-            const skip = (page - 1) * limit;
-            const papers = await ResearchPaper.find(
-                { $text: { $search: query }, isPublished: true },
-                { score: { $meta: "textScore" } }
-            )
-                .sort({ score: { $meta: "textScore" } })
-                .skip(skip)
-                .limit(limit);
-            return papers;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
+      const total = await ResearchPaper.countDocuments(filters);
+      return { papers, total };
+    } catch (error) {
+      console.log("Repository Error (getAll):", error.message);
+      throw error;
     }
+  }
 
-    async getPapersByAuthor(authorId, page = 1, limit = 10) {
-        try {
-            const skip = (page - 1) * limit;
-            const papers = await ResearchPaper.find({ 'authors._id': authorId, isPublished: true })
-                .sort({ publicationDate: -1 })
-                .skip(skip)
-                .limit(limit);
-            return papers;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
-    }
+  async searchPapers(query, page = 1, limit = 10) {
+    try {
+      const skip = (page - 1) * limit;
+      const filter = { $text: { $search: query }, isPublished: true };
 
-    async incrementViews(paperId) {
-        try {
-            const paper = await ResearchPaper.findByIdAndUpdate(
-                paperId,
-                { $inc: { views: 1 } },
-                { new: true }
-            );
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
-    }
+      const papers = await ResearchPaper.find(filter, { score: { $meta: "textScore" } })
+        .sort({ score: { $meta: "textScore" } })
+        .skip(skip)
+        .limit(limit)
+        .lean();
 
-    async incrementDownloads(paperId) {
-        try {
-            const paper = await ResearchPaper.findByIdAndUpdate(
-                paperId,
-                { $inc: { downloads: 1 } },
-                { new: true }
-            );
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in repository layer");
-            throw error;
-        }
+      const total = await ResearchPaper.countDocuments(filter);
+      return { papers, total };
+    } catch (error) {
+      console.log("Repository Error (searchPapers):", error.message);
+      throw error;
     }
+  }
+
+  async incrementViews(paperId) {
+    try {
+      const paper = await ResearchPaper.findByIdAndUpdate(
+        paperId,
+        { $inc: { views: 1 } },
+        { new: true }
+      ).lean();
+      return paper;
+    } catch (error) {
+      console.log("Repository Error (incrementViews):", error.message);
+      throw error;
+    }
+  }
+
+  async incrementDownloads(paperId) {
+    try {
+      const paper = await ResearchPaper.findByIdAndUpdate(
+        paperId,
+        { $inc: { downloads: 1 } },
+        { new: true }
+      ).lean();
+      return paper;
+    } catch (error) {
+      console.log("Repository Error (incrementDownloads):", error.message);
+      throw error;
+    }
+  }
 }
 
 export default ResearchPaperRepository;

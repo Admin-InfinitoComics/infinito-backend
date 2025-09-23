@@ -1,162 +1,150 @@
 import ResearchPaperRepository from "../repository/research-paper-repository.js";
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 class ResearchPaperService {
-    constructor() {
-        this.researchPaperRepository = new ResearchPaperRepository();
-    }
+  constructor() {
+    this.researchPaperRepository = new ResearchPaperRepository();
+  }
 
-    async createPaper(data) {
-        try {
-            const requiredFields = [
-                'title', 'authors', 'abstract', 'introduction',
-                'relatedWork', 'methodology', 'experimentalResults',
-                'discussion', 'conclusion', 'publicationDate'
-            ];
+  async createPaper(data) {
+    try {
+      // Required fields
+      const requiredFields = [
+        "title","abstract","keywords","introduction",
+        "relatedWork","methodology","experimentalResults",
+        "discussion","conclusion","references","publicationDate","authors"
+      ];
+      for (const field of requiredFields) {
+        if (!data[field]) throw new Error(`${field} is required`);
+      }
 
-            for (const field of requiredFields) {
-                if (!data[field]) {
-                    throw new Error(`${field} is required`);
-                }
-            }
+      // Convert keywords string to array if needed
+      if (typeof data.keywords === "string") {
+        data.keywords = data.keywords.split(",").map(k => k.trim()).filter(k => k);
+      }
 
-            if (!Array.isArray(data.authors) || data.authors.length === 0) {
-                throw new Error('At least one author is required');
-            }
+      // Convert references string to array of objects
+      if (typeof data.references === "string") {
+        data.references = data.references
+          .split("\n")
+          .map(ref => ref.trim())
+          .filter(ref => ref)
+          .map(ref => ({ text: ref }));
+      }
 
-            const paper = await this.researchPaperRepository.createPaper({
-                ...data,
-                isPublished: data.isPublished || false,
-                createdBy: new mongoose.Types.ObjectId(data.createdBy)
-            });
-
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
+      // Validate authors
+      if (!Array.isArray(data.authors) || data.authors.length === 0) {
+        throw new Error("At least one author is required");
+      }
+      data.authors.forEach((author, i) => {
+        if (!author.affiliation || author.affiliation.trim() === "") {
+          throw new Error(`Affiliation is required for author at index ${i}`);
         }
+      });
+
+      const paper = await this.researchPaperRepository.createPaper({
+        ...data,
+        isPublished: data.isPublished || false,
+        createdBy: new mongoose.Types.ObjectId(data.createdBy)
+      });
+
+      return paper;
+    } catch (error) {
+      console.log("Service Error (createPaper):", error.message);
+      throw error;
     }
+  }
 
-    async updatePaper(paperId, data, userId) {
-        try {
-            const existingPaper = await this.researchPaperRepository.findById(paperId);
-            if (!existingPaper) {
-                throw new Error('Paper not found');
-            }
+  async updatePaper(paperId, data, userId) {
+    try {
+      const existingPaper = await this.researchPaperRepository.findById(paperId);
+      if (!existingPaper) throw new Error("Paper not found");
+      if (existingPaper.createdBy.toString() !== userId) throw new Error("Not authorized");
 
-            if (existingPaper.createdBy.toString() !== userId) {
-                throw new Error('Not authorized to update this paper');
-            }
+      const { _id, createdBy, createdAt, ...updateData } = data;
 
-            const { _id, createdBy, createdAt, ...updateData } = data;
+      // Convert keywords & references
+      if (updateData.keywords && typeof updateData.keywords === "string") {
+        updateData.keywords = updateData.keywords.split(",").map(k => k.trim()).filter(k => k);
+      }
+      if (updateData.references && typeof updateData.references === "string") {
+        updateData.references = updateData.references.split("\n").map(r => r.trim()).filter(r => r).map(r => ({ text: r }));
+      }
 
-            const updatedPaper = await this.researchPaperRepository.update(paperId, updateData);
-            return updatedPaper;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
+      // Validate authors
+      if (updateData.authors) {
+        if (!Array.isArray(updateData.authors) || updateData.authors.length === 0) {
+          throw new Error("At least one author is required");
         }
+        updateData.authors.forEach((author, i) => {
+          if (!author.affiliation || author.affiliation.trim() === "") {
+            throw new Error(`Affiliation is required for author at index ${i}`);
+          }
+        });
+      }
+
+      return await this.researchPaperRepository.update(paperId, updateData);
+    } catch (error) {
+      console.log("Service Error (updatePaper):", error.message);
+      throw error;
     }
+  }
 
-    async deletePaper(paperId, userId) {
-        try {
-            const existingPaper = await this.researchPaperRepository.findById(paperId);
-            if (!existingPaper) {
-                throw new Error('Paper not found');
-            }
+  async deletePaper(paperId, userId) {
+    try {
+      const existingPaper = await this.researchPaperRepository.findById(paperId);
+      if (!existingPaper) throw new Error("Paper not found");
+      if (existingPaper.createdBy.toString() !== userId) throw new Error("Not authorized");
 
-            if (existingPaper.createdBy.toString() !== userId) {
-                throw new Error('Not authorized to delete this paper');
-            }
-
-            const response = await this.researchPaperRepository.destroy(paperId);
-            return response;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
-        }
+      return await this.researchPaperRepository.destroy(paperId);
+    } catch (error) {
+      console.log("Service Error (deletePaper):", error.message);
+      throw error;
     }
+  }
 
-    async getPaper(paperId, incrementView = false) {
-        try {
-            const paper = await this.researchPaperRepository.findById(paperId);
-
-            if (!paper) {
-                throw new Error('Paper not found');
-            }
-
-            if (incrementView) {
-                await this.researchPaperRepository.incrementViews(paperId);
-            }
-
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
-        }
+  async getPaper(paperId, incrementView = false) {
+    try {
+      if (incrementView) return await this.researchPaperRepository.incrementViews(paperId);
+      return await this.researchPaperRepository.findById(paperId);
+    } catch (error) {
+      console.log("Service Error (getPaper):", error.message);
+      throw error;
     }
+  }
 
-    async getAllPapers(page = 1, limit = 10, filters = {}) {
-        try {
-            const query = { isPublished: true, ...filters };
+  async getAllPapers(page = 1, limit = 10, filters = {}) {
+  const skip = (page - 1) * limit;
+  const papers = await this.researchPaperRepository.model
+    .find(filters)
+    .sort({ publicationDate: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
 
-            const papers = await this.researchPaperRepository.getAll(
-                page,
-                limit,
-                query,
-                { publicationDate: -1 }
-            );
+  const total = await this.researchPaperRepository.model.countDocuments(filters);
 
-            return papers;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
-        }
+  return { papers, total };
+}
+
+  async searchPapers(query, page = 1, limit = 10) {
+    try {
+      if (!query || query.trim() === "") return await this.getAllPapers(page, limit);
+      return await this.researchPaperRepository.searchPapers(query, page, limit);
+    } catch (error) {
+      console.log("Service Error (searchPapers):", error.message);
+      throw error;
     }
+  }
 
-    async searchPapers(query, page = 1, limit = 10) {
-        try {
-            if (!query || query.trim() === '') {
-                return await this.getAllPapers(page, limit);
-            }
-
-            const papers = await this.researchPaperRepository.searchPapers(
-                query,
-                page,
-                limit
-            );
-
-            return papers;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
-        }
+  async incrementDownloads(paperId) {
+    try {
+      return await this.researchPaperRepository.incrementDownloads(paperId);
+    } catch (error) {
+      console.log("Service Error (incrementDownloads):", error.message);
+      throw error;
     }
-
-    async getPapersByAuthor(authorId, page = 1, limit = 10) {
-        try {
-            const papers = await this.researchPaperRepository.getPapersByAuthor(
-                authorId,
-                page,
-                limit
-            );
-
-            return papers;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
-        }
-    }
-
-    async incrementDownloads(paperId) {
-        try {
-            const paper = await this.researchPaperRepository.incrementDownloads(paperId);
-            return paper;
-        } catch (error) {
-            console.log("Something went wrong in service layer");
-            throw error;
-        }
-    }
+  }
 }
 
 export default ResearchPaperService;
