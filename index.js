@@ -1,10 +1,10 @@
+import cors from "cors";
 import express from "express";
 import bodyParser from "body-parser";
 const app = express();
 import config from "./config/server-config.js"
 import connect from "./config/database-config.js"
 import userroutes from "./routes/user-routes.js";
-import cors from "cors";
 import blogroutes from './routes/blog-routes.js';
 import faqRoutes from './routes/faqRoutes.js';
 import multer from 'multer';
@@ -20,27 +20,26 @@ import paymentRoutes from './routes/payment-routes.js'
 import comicChapRoutes from './routes/comicChap-routes.js'
 
 
+// ✅ Include all frontend domains here
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3001",
-  "http://localhost:3002",
-  "http://localhost:3003",
-  config.FRONTEND_URL,
-  config.ADMIN_URL,
-  config.RESEARCH_URL,
-  config.FOUNDATION_URL
+  "https://infinitocomics.com",
+  "https://admin.infinitocomics.com",
+  "https://foundation.infinitocomics.com",
+  "https://research.infinitocomics.com"
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow non-browser clients (like Postman)
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+    // Allow requests with no origin (like curl/Postman) 
+    // or if origin is in whitelist
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
     } else {
-      return callback(new Error("Not allowed by CORS"));
+      callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 }));
 
 
