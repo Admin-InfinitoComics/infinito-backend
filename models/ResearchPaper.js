@@ -1,25 +1,22 @@
 import mongoose from "mongoose";
 
-// ✅ Author Subdocument Schema
+// ✅ Author Subdocument Schema (only affiliation now)
 const AuthorSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String },
-  affiliation: { type: String },
-  orcid: { type: String }
-}, { _id: false }); // Avoid nested _id for subdocs
+  affiliation: { type: String, required: [true, 'Author affiliation is required'] },
+}, { _id: false });
 
-// ✅ Reference Subdocument Schema
+// ✅ Reference Subdocument Schema (optional DOI)
 const ReferenceSchema = new mongoose.Schema({
-  text: { type: String, required: true },
-  doi: { type: String }
-}, { _id: false }); // Optional: avoids nested _id
+  text: { type: String, required: [true, 'Reference text is required'] },
+  doi: { type: String, trim: true }
+}, { _id: false });
 
 // ✅ Utility: Validate at least one author
 function arrayLimit(val) {
   return Array.isArray(val) && val.length > 0;
 }
 
-// ✅ Main Schema
+// ✅ Main Research Paper Schema
 const ResearchPaperSchema = new mongoose.Schema({
   title: { 
     type: String, 
@@ -28,7 +25,7 @@ const ResearchPaperSchema = new mongoose.Schema({
   },
   authors: {
     type: [AuthorSchema],
-    required: true, 
+    required: [true, 'At least one author is required'], 
     validate: {
       validator: arrayLimit,
       message: 'At least one author is required'
@@ -66,14 +63,7 @@ const ResearchPaperSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Conclusion section is required']
   },
-  acknowledgments: {
-    type: String
-  },
   references: [ReferenceSchema],
-  doi: { 
-    type: String,
-    trim: true
-  },
   publicationDate: {
     type: Date,
     required: [true, 'Publication date is required']
@@ -109,15 +99,15 @@ const ResearchPaperSchema = new mongoose.Schema({
 ResearchPaperSchema.index({
   title: 'text',
   abstract: 'text',
-  'authors.name': 'text',
+  'authors.affiliation': 'text',
   keywords: 'text'
 });
 
-// ✅ Citation virtual property
+// ✅ Virtual: citation (optional for future use)
 ResearchPaperSchema.virtual('citation').get(function() {
-  const authors = this.authors.map(a => a.name).join(', ');
+  const affiliations = this.authors.map(a => a.affiliation).join(', ');
   const year = this.publicationDate ? this.publicationDate.getFullYear() : 'n.d.';
-  return `${authors} (${year}). ${this.title}.`;
+  return `${affiliations} (${year}). ${this.title}.`;
 });
 
 // ✅ Auto-update lastUpdated field
