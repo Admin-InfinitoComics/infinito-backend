@@ -43,9 +43,9 @@ const ResearchPaperSchema = new mongoose.Schema({
     type: String, 
     required: [true, 'Introduction is required']
   },
-  relatedWork: {
+  objective: {
     type: String,
-    required: [true, 'Related work section is required']
+    required: [true, 'Objective section is required']
   },
   methodology: {
     type: String,
@@ -88,7 +88,26 @@ const ResearchPaperSchema = new mongoose.Schema({
   views: {
     type: Number,
     default: 0
-  }
+  },
+  category: { 
+    type: String, 
+    enum: [
+      "Business",
+      "Psychology",
+      "Design",
+      "Technology",
+      "Humanities",
+      "Communities",
+      "Philosophy"
+    ],
+    required: true
+  },
+  name: { 
+    type: String, 
+    required: [true, 'Name is required'],
+    trim: true
+  },
+  pdfUrl: { type: String } // S3 URL for PDF
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

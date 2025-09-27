@@ -10,12 +10,19 @@ class ResearchPaperService {
     try {
       // Required fields
       const requiredFields = [
+        "name",
         "title","abstract","keywords","introduction",
-        "relatedWork","methodology","experimentalResults",
-        "discussion","conclusion","references","publicationDate","authors"
+        "objective",
+        "methodology","experimentalResults",
+        "discussion","conclusion",
+        "publicationDate","category",
+        "authors",
+        "pdfUrl" // added
       ];
       for (const field of requiredFields) {
-        if (!data[field]) throw new Error(`${field} is required`);
+        if (!data[field] || (typeof data[field] === "string" && data[field].trim() === "")) {
+          throw new Error(`${field} is required`);
+        }
       }
 
       // Convert keywords string to array if needed
@@ -41,6 +48,11 @@ class ResearchPaperService {
           throw new Error(`Affiliation is required for author at index ${i}`);
         }
       });
+
+      // Validate pdfUrl
+      if (!data.pdfUrl || typeof data.pdfUrl !== "string" || !data.pdfUrl.startsWith("http")) {
+        throw new Error("pdfUrl is required and must be a valid URL");
+      }
 
       const paper = await this.researchPaperRepository.createPaper({
         ...data,
@@ -81,6 +93,14 @@ class ResearchPaperService {
             throw new Error(`Affiliation is required for author at index ${i}`);
           }
         });
+      }
+
+      // Validate name and category if present
+      if ('name' in updateData && (!updateData.name || updateData.name.trim() === "")) {
+        throw new Error("Name is required");
+      }
+      if ('category' in updateData && (!updateData.category || updateData.category.trim() === "")) {
+        throw new Error("Category is required");
       }
 
       return await this.researchPaperRepository.update(paperId, updateData);

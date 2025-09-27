@@ -22,6 +22,7 @@ import comicChapRoutes from './routes/comicChap-routes.js'
 
 const allowedOrigins = [
   "https://infinitocomics.com",
+  "https://api.infinitocomics.com",
   "http://localhost:3001",
   "http://localhost:3002",
   "http://localhost:3003"
