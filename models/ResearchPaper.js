@@ -1,11 +1,17 @@
 import mongoose from "mongoose";
 
-// ✅ Author Subdocument Schema (only affiliation now)
+// Author Subdocument Schema (name and affiliation)
 const AuthorSchema = new mongoose.Schema({
+  name: { type: String, required: [true, 'Author name is required'] },
   affiliation: { type: String, required: [true, 'Author affiliation is required'] },
 }, { _id: false });
 
-// ✅ Reference Subdocument Schema (optional DOI)
+// Mentor Subdocument Schema (only name)
+const MentorSchema = new mongoose.Schema({
+  name: { type: String, required: [true, 'Mentor name is required'] }
+}, { _id: false });
+
+// Reference Subdocument Schema (optional DOI)
 const ReferenceSchema = new mongoose.Schema({
   text: { type: String, required: [true, 'Reference text is required'] },
   doi: { type: String, trim: true }
@@ -31,6 +37,10 @@ const ResearchPaperSchema = new mongoose.Schema({
       message: 'At least one author is required'
     }
   },
+  mentors: {
+    type: [MentorSchema],
+    default: []
+  },
   abstract: { 
     type: String, 
     required: [true, 'Abstract is required']
@@ -46,6 +56,10 @@ const ResearchPaperSchema = new mongoose.Schema({
   objective: {
     type: String,
     required: [true, 'Objective section is required']
+  },
+  literature: { 
+    type: String, 
+    required: [true, 'Literature section is required']
   },
   methodology: {
     type: String,
@@ -101,11 +115,6 @@ const ResearchPaperSchema = new mongoose.Schema({
       "Philosophy"
     ],
     required: true
-  },
-  name: { 
-    type: String, 
-    required: [true, 'Name is required'],
-    trim: true
   },
   pdfUrl: { type: String } // S3 URL for PDF
 }, {

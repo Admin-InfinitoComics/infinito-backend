@@ -49,12 +49,13 @@ const createPaper = async (req, res) => {
     let pdfUrl = "";
     try {
       pdfUrl = await uploadPdfToS3(req.file);
+      console.log("PDF uploaded to S3, url:", pdfUrl);
     } catch (err) {
       console.error("S3 upload error:", err);
       return res.status(500).json({ success: false, message: "PDF upload failed", data: {}, err: err.message });
     }
 
-    // Parse authors if sent as JSON string
+    // Parse authors and mentors if sent as JSON string
     let authors = req.body.authors;
     if (typeof authors === "string") {
       try {
@@ -64,30 +65,62 @@ const createPaper = async (req, res) => {
         return res.status(400).json({ success: false, message: "Invalid authors format", data: {}, err: err.message });
       }
     }
+    let mentors = req.body.mentors;
+    if (typeof mentors === "string") {
+      try {
+        mentors = JSON.parse(mentors);
+      } catch (err) {
+        console.error("Mentors JSON parse error:", err);
+        return res.status(400).json({ success: false, message: "Invalid mentors format", data: {}, err: err.message });
+      }
+    }
 
-    // Validate required fields
+    // Validate required fields (remove .trim() for arrays/objects)
     const requiredFields = [
-      "name", "title", "abstract", "keywords", "introduction", "objective",
+      "title", "abstract", "keywords", "introduction", "objective", "literature",
       "methodology", "experimentalResults", "discussion", "conclusion",
       "publicationDate", "category"
     ];
     for (const field of requiredFields) {
-      if (!req.body[field] || req.body[field].trim() === "") {
+      if (
+        req.body[field] === undefined ||
+        req.body[field] === null ||
+        (typeof req.body[field] === "string" && req.body[field].trim() === "")
+      ) {
         return res.status(400).json({ success: false, message: `${field} is required`, data: {}, err: `${field} missing` });
       }
     }
     if (!authors || !Array.isArray(authors) || authors.length === 0) {
       return res.status(400).json({ success: false, message: "At least one author is required", data: {}, err: "authors missing" });
     }
+    for (const a of authors) {
+      if (!a.name || !a.affiliation) {
+        return res.status(400).json({ success: false, message: "Each author must have name and affiliation", data: {}, err: "author fields missing" });
+      }
+    }
+    if (mentors && Array.isArray(mentors)) {
+      for (const m of mentors) {
+        if (!m.name) {
+          return res.status(400).json({ success: false, message: "Each mentor must have a name", data: {}, err: "mentor name missing" });
+        }
+      }
+    }
 
     const data = {
       ...req.body,
       authors,
+      mentors,
       pdfUrl,
       createdBy: req.user._id,
     };
 
+    // Log before DB save
+    console.log("Saving paper to DB with data:", data);
+
     const paper = await researchPaperService.createPaper(data);
+
+    // Log after DB save
+    console.log("Paper saved to DB:", paper);
 
     return res.status(201).json({ success: true, message: "Research paper created successfully", data: paper, err: {} });
   } catch (error) {
@@ -208,3 +241,4 @@ export const getSignedPdfUrl = async (req, res) => {
     return res.status(500).json({ success: false, message: "Error generating signed URL", error: error.message });
   }
 };
+  
