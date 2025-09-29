@@ -10,14 +10,13 @@ class ResearchPaperService {
     try {
       // Required fields
       const requiredFields = [
-        "name",
+        // "name", // REMOVE this line, name is no longer required
         "title","abstract","keywords","introduction",
-        "objective",
+        "objective","literature",
         "methodology","experimentalResults",
         "discussion","conclusion",
         "publicationDate","category",
-        "authors",
-        "pdfUrl" // added
+        "authors"
       ];
       for (const field of requiredFields) {
         if (!data[field] || (typeof data[field] === "string" && data[field].trim() === "")) {
@@ -48,11 +47,6 @@ class ResearchPaperService {
           throw new Error(`Affiliation is required for author at index ${i}`);
         }
       });
-
-      // Validate pdfUrl
-      if (!data.pdfUrl || typeof data.pdfUrl !== "string" || !data.pdfUrl.startsWith("http")) {
-        throw new Error("pdfUrl is required and must be a valid URL");
-      }
 
       const paper = await this.researchPaperRepository.createPaper({
         ...data,
