@@ -23,16 +23,13 @@ import comicChapRoutes from './routes/comicChap-routes.js'
 // ✅ Include all frontend domains here
 const allowedOrigins = [
   "https://infinitocomics.com",
-<<<<<<< HEAD
   "https://api.infinitocomics.com",
   "http://localhost:3001",
   "http://localhost:3002",
-  "http://localhost:3003"
-=======
+  "http://localhost:3003",
   "https://admin.infinitocomics.com",
   "https://foundation.infinitocomics.com",
   "https://research.infinitocomics.com"
->>>>>>> 031b8b6fbde5cc6ccaf90da0deb0ca75484d1b2e
 ];
 
 app.use(cors({
