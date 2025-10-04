@@ -30,12 +30,22 @@ const loginAdmin = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const adminData = await adminService.loginAdmin(email, password);
+        const { token, admin } = await adminService.loginAdmin(email, password);
+
+        // Set token in cookie with domain configuration for cross-subdomain access
+        res.cookie("token", token, {
+            httpOnly: true,             // Not accessible from JS
+            secure: process.env.NODE_ENV === 'production',  // HTTPS only in production
+            sameSite: "lax",           // Required for cross-domain/subdomain
+            domain: ".infinitocomics.com", // All subdomains of infinitocomics.com
+            path: "/",
+            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
 
         return res.status(200).json({
             success: true,
             message: "Successfully logged in",
-            data: adminData,
+            data: { id: admin._id, email: admin.email, name: admin.name, role: admin.role },
         });
     } catch (error) {
         return res.status(400).json({
@@ -126,9 +136,35 @@ const deleteAdmin = async (req, res) => {
     }
 };
 
+// Logout an admin
+const logoutAdmin = async (req, res) => {
+    try {
+        // Clear the token cookie
+        res.cookie("token", "", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: "lax",
+            domain: ".infinitocomics.com",
+            path: "/",
+            maxAge: 0, // Expire immediately
+        });
+        
+        return res.status(200).json({
+            success: true,
+            message: "Successfully logged out",
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
 export default {
     createAdmin,
     loginAdmin,
+    logoutAdmin,
     getAllAdmins,
     getAdminById,
     updateAdmin,

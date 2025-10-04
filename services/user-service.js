@@ -2,41 +2,17 @@ import UserRepository from "../repository/user-repository.js";
 import jwt from "jsonwebtoken";
 import config from "../config/server-config.js";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
 import { uploadToS3 } from "../utils/aws.js";
 import { sendForgotPasswordEmail } from "../utils/sendEmail.js";
+
 class UserService {
   constructor() {
     this.userRepository = new UserRepository();
   }
 
-  async getAll() {
-    return await this.userRepository.getAll();
-  }
-
-  async signup(data) {
-    const user = await this.userRepository.findByEmail(data.email);
-    if (user) throw new Error("User is already registered");
-    // ⚠️ Password is stored as-is (plain text)
-    return await this.userRepository.createuser(data);
-  }
-
-  async login(data) {
-    const user = await this.userRepository.findByEmail(data.email);
-    if (!user) throw new Error("Invalid email");
-    const user1 = bcrypt.compare(data.password, user.password);
-    if (!user1) throw new Error("Invalid password");
-
-    const payload = { id: user._id, email: user.email };
-    const token = jwt.sign(payload, config.JWT_SECRET_KEY, {
-      expiresIn: config.JWT_EXPIRY_DATE,
-    });
-
-    return { token, user };
-  }
-
-  async logout(user) {
-    return true;
+  // 🔹 For Admin Panel (restricted with middleware)
+  async getAll(adminId) {
+    return await this.userRepository.getAllByAdmin(adminId); // filter users per admin
   }
 
   async getById(id) {
@@ -51,77 +27,92 @@ class UserService {
     return await this.userRepository.findByIdandDelete(id);
   }
 
-  async changePassword(id, data) {
+  // 🔹 For Normal Users (multi-page)
+  async signup(data) {
+    const existing = await this.userRepository.findByEmail(data.email);
+    if (existing) throw new Error("User already registered");
+
+    // Hash password before storing
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const userData = { ...data, password: hashedPassword };
+
+    return await this.userRepository.createuser(userData);
+  }
+
+  async login(data) {
+    const user = await this.userRepository.findByEmail(data.email);
+    if (!user) throw new Error("Invalid email");
+
+    const isMatch = await bcrypt.compare(data.password, user.password);
+    if (!isMatch) throw new Error("Invalid password");
+
+    const payload = { id: user._id, email: user.email };
+    const token = jwt.sign(payload, config.JWT_SECRET_KEY, {
+      expiresIn: config.JWT_EXPIRY_DATE,
+    });
+
+    return { token, user };
+  }
+
+  async logout(user) {
+    // Stateless JWT logout → nothing to do server-side
+    return true;
+  }
+
+  async changePassword(id, { oldPassword, newPassword }) {
     const user = await this.userRepository.getById(id);
-    if (data.oldPassword !== user.password) throw new Error("Old password does not match");
-    return await this.userRepository.findByIdandUpdate(id, { password: data.newPassword });
+    if (!user) throw new Error("User not found");
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch) throw new Error("Old password does not match");
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    return await this.userRepository.findByIdandUpdate(id, { password: hashedPassword });
   }
 
   async getProfile(id) {
     return await this.userRepository.getProfile(id);
   }
 
+  // 🔹 Upload profile image
   async upload(file) {
-    try {
-      if (!file) throw new Error("No file uploaded");
+    if (!file) throw new Error("No file uploaded");
 
-      const { buffer, originalname, mimetype } = file;
-      const { Location, Key, Bucket } = await uploadToS3(buffer, originalname, mimetype);
+    const { buffer, originalname, mimetype } = file;
+    const { Location, Key, Bucket } = await uploadToS3(buffer, originalname, mimetype);
 
-      return { 
-        url: Location, 
-        key: Key, 
-        bucket: Bucket 
-      };
-
-    } catch (error) {
-      throw new Error("File upload failed: " + error.message);
-    }
+    return { url: Location, key: Key, bucket: Bucket };
   }
 
+  // 🔹 Email verification
   async verify(data) {
-      try {
-          const response = await this.userRepository.verify(data);
-          return response;
-      } catch (error) {
-          console.log('Something wrong at service level');
-          throw error;
-      }
-    }
+    return await this.userRepository.verify(data);
+  }
 
-    async forgetPassword(email) {
-      try {
-        const user = await this.userRepository.findByEmail(email);
-        if(!user){
-          throw new Error("Could not find email");
-        }
-        const payload = {
-          id: user._id,
-          email: user.email,
-        };
-        const resetToken = jwt.sign(payload, config.JWT_SECRET_KEY, {
-          expiresIn: config.FORGET_PASSWORD_EXPIRY // expires in 5 minutes
-        });
-        const resetLink = `${config.FRONTEND_URL}/reset-password/${user._id}/${resetToken}`   
-        sendForgotPasswordEmail(user.email, resetLink, user.name);     
-        return user;    
-      } catch (error) {
-        console.log("Something wrong at service layer");
-        throw  error;
-      }
-    }
+  // 🔹 Forgot / Reset password
+  async forgetPassword(email) {
+    const user = await this.userRepository.findByEmail(email);
+    if (!user) throw new Error("Email not found");
 
-    async resetPassword(userId, newPassword) {
-      try {
-        const user = await this.userRepository.getById(userId);
-        if (!user) throw new Error("User not found");
-        const hashedPassword = await bcrypt.hash(newPassword, 5);
-        await this.userRepository.findByIdandUpdate(userId, {password: hashedPassword});
-        return user;
-      } catch (error) {
-        console.log("Something wrong at service level", error);
-        throw error;
-      }
+    const payload = { id: user._id, email: user.email };
+    const resetToken = jwt.sign(payload, config.JWT_SECRET_KEY, {
+      expiresIn: config.FORGET_PASSWORD_EXPIRY, // e.g. 5 minutes
+    });
+
+    const resetLink = `${config.FRONTEND_URL}/reset-password/${user._id}/${resetToken}`;
+    await sendForgotPasswordEmail(user.email, resetLink, user.name);
+
+    return { message: "Reset link sent to email" };
+  }
+
+  async resetPassword(userId, newPassword) {
+    const user = await this.userRepository.getById(userId);
+    if (!user) throw new Error("User not found");
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.findByIdandUpdate(userId, { password: hashedPassword });
+
+    return { message: "Password reset successful" };
   }
 }
 

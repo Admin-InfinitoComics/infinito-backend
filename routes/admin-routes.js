@@ -10,6 +10,9 @@ router.post('/create', AdminController.createAdmin);
 // Route to login an admin
 router.post('/login', AdminController.loginAdmin);
 
+// Route to logout an admin
+router.post('/logout', adminauthenticate, AdminController.logoutAdmin);
+
 // Route to get all admins
 router.get('/all', AdminController.getAllAdmins);
 

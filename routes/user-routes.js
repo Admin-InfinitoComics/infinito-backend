@@ -23,6 +23,9 @@ router.delete('/delete', Usercontroller.deleteUser);
 // Login (auth)
 router.post('/login', Usercontroller.login);
 
+// Check if user is authenticated
+router.get('/check-auth', authenticate, Usercontroller.checkAuth);
+
 // Optional: Logout
 router.post('/logout', Usercontroller.logout);
 

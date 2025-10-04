@@ -22,8 +22,23 @@ const signup = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const token = await userservice.login(req.body);
-    res.status(200).json({ token, success: true });
+    const { token, user } = await userservice.login(req.body);
+
+    // Set token in cookie with domain configuration for cross-subdomain access
+    res.cookie("token", token, {
+      httpOnly: true,             // Not accessible from JS
+      secure: process.env.NODE_ENV === 'production',  // HTTPS only in production
+      sameSite: "lax",           // Required for cross-domain/subdomain
+      domain: ".infinitocomics.com", // All subdomains of infinitocomics.com
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: { id: user._id, email: user.email, name: user.name },
+    });
   } catch (error) {
     res.status(401).json({ message: error.message, success: false });
   }
@@ -32,6 +47,17 @@ const login = async (req, res) => {
 const logout = async (req, res) => {
   try {
     await userservice.logout(req.user);
+    
+    // Clear the token cookie
+    res.cookie("token", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: "lax",
+      domain: ".infinitocomics.com",
+      path: "/",
+      maxAge: 0, // Expire immediately
+    });
+    
     res.status(200).json({ message: "Logout successful", success: true });
   } catch (error) {
     res.status(500).json({ message: error.message, success: false });
@@ -178,6 +204,30 @@ const forgetPasswordEmail = async (req, res) =>  {
   }
 }
 
+// Check if user is authenticated
+const checkAuth = async (req, res) => {
+  try {
+    // If this point is reached, the user is authenticated (auth middleware has run)
+    if (req.user) {
+      return res.status(200).json({
+        success: true,
+        message: "User is authenticated",
+        data: { id: req.user._id, email: req.user.email, name: req.user.name }
+      });
+    } else {
+      return res.status(401).json({
+        success: false,
+        message: "User is not authenticated"
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 const Usercontroller = {
   signup,
   login,
@@ -193,7 +243,8 @@ const Usercontroller = {
   uploadimage,
   verifyemail,
   forgetPasswordFunc,
-  forgetPasswordEmail
+  forgetPasswordEmail,
+  checkAuth
 };
 
 export default Usercontroller;

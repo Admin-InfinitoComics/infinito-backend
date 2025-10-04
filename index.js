@@ -18,6 +18,7 @@ import researchPaperRoutes from './routes/research-paper-routes.js';
 import aboutTimelineRoutes from './routes/aboutTimelineRoutes.js';
 import paymentRoutes from './routes/payment-routes.js'
 import comicChapRoutes from './routes/comicChap-routes.js'
+import cookieParser from "cookie-parser";
 
 
 // ✅ Include all frontend domains here
@@ -32,6 +33,7 @@ const allowedOrigins = [
   "https://research.infinitocomics.com"
 ];
 
+app.use(cookieParser());
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like curl/Postman) 
